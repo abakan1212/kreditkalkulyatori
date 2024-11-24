@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kredit Kalkulyatori</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/telegram-web-app/7.0.0/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .calculator {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        button {
+            background: #2481cc;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background: #1e6fb0;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .result p {
+            margin: 5px 0;
+            font-size: 15px;
+        }
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .schedule-table th, .schedule-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: right;
+        }
+        .schedule-table th {
+            background: #f8f9fa;
+            text-align: center;
+        }
+        .down-payment-info {
+            background: #e8f4ff;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="input-group">
+            <label>Umumiy summa (so'm)</label>
+            <input type="number" id="totalAmount" placeholder="Misol: 100000000" onchange="updateDownPayment()">
+        </div>
+
+        <div class="input-group">
+            <label>Boshlang'ich to'lov (% da)</label>
+            <input type="number" id="downPaymentPercent" placeholder="Misol: 15" value="15" onchange="updateDownPayment()">
+        </div>
+
+        <div class="down-payment-info">
+            <p>Boshlang'ich to'lov miqdori: <span id="downPaymentAmount">0</span> so'm</p>
+            <p>Kredit miqdori: <span id="loanAmount">0</span> so'm</p>
+        </div>
+        
+        <div class="input-group">
+            <label>Kredit muddati (oy)</label>
+            <input type="number" id="loanTerm" placeholder="Misol: 12">
+        </div>
+        
+        <div class="input-group">
+            <label>Yillik foiz stavkasi (%)</label>
+            <input type="number" id="interestRate" placeholder="Misol: 24">
+        </div>
+        
+        <div class="input-group">
+            <label>To'lov turi</label>
+            <select id="paymentType">
+                <option value="annuitet">Annuitet</option>
+                <option value="differentiated">Differentsial</option>
+            </select>
+        </div>
+
+        <button onclick="calculateLoan()">Hisoblash</button>
+        
+        <div id="result" class="result" style="display: none;">
+            <p>Birinchi oylik to'lov: <span id="monthlyPayment">0</span> so'm</p>
+            <p>Jami to'lov: <span id="totalPayment">0</span> so'm</p>
+            <p>Foiz to'lovi: <span id="totalInterest">0</span> so'm</p>
+        </div>
+
+        <div id="scheduleContainer" style="display: none; overflow-x: auto;">
+            <h3>To'lov jadvali</h3>
+            <table class="schedule-table">
+                <thead>
+                    <tr>
+                        <th>Oy</th>
+                        <th>Asosiy qarz</th>
+                        <th>Foiz to'lovi</th>
+                        <th>Jami to'lov</th>
+                        <th>Qoldiq</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function formatNumber(num) {
+            return Math.round(num).toLocaleString('uz-UZ');
+        }
+
+        function updateDownPayment() {
+            const totalAmount = parseFloat(document.getElementById('totalAmount').value) || 0;
+            const downPaymentPercent = parseFloat(document.getElementById('downPaymentPercent').value) || 0;
+            
+            const downPaymentAmount = totalAmount * (downPaymentPercent / 100);
+            const loanAmount = totalAmount - downPaymentAmount;
+            
+            document.getElementById('downPaymentAmount').textContent = formatNumber(downPaymentAmount);
+            document.getElementById('loanAmount').textContent = formatNumber(loanAmount);
+        }
+
+        function calculateLoan() {
+            const totalAmount = parseFloat(document.getElementById('totalAmount').value);
+            const downPaymentPercent = parseFloat(document.getElementById('downPaymentPercent').value);
+            const downPaymentAmount = totalAmount * (downPaymentPercent / 100);
+            const amount = totalAmount - downPaymentAmount;
+            const term = parseInt(document.getElementById('loanTerm').value);
+            const rate = parseFloat(document.getElementById('interestRate').value) / 100 / 12;
+            const paymentType = document.getElementById('paymentType').value;
+            
+            let schedule = [];
+            let remainingBalance = amount;
+            let totalPayment = 0;
+            let totalInterest = 0;
+
+            if (paymentType === 'annuitet') {
+                const monthlyPayment = amount * (rate * Math.pow(1 + rate, term)) / (Math.pow(1 + rate, term) - 1);
+                
+                for (let month = 1; month <= term; month++) {
+                    const interest = remainingBalance * rate;
+                    const principal = monthlyPayment - interest;
+                    remainingBalance -= principal;
+                    
+                    schedule.push({
+                        month: month,
+                        principal: principal,
+                        interest: interest,
+                        payment: monthlyPayment,
+                        balance: Math.max(0, remainingBalance)
+                    });
+
+                    totalPayment += monthlyPayment;
+                    totalInterest += interest;
+                }
+            } else {
+                const principal = amount / term;
+                
+                for (let month = 1; month <= term; month++) {
+                    const interest = remainingBalance * rate;
+                    const payment = principal + interest;
+                    remainingBalance -= principal;
+                    
+                    schedule.push({
+                        month: month,
+                        principal: principal,
+                        interest: interest,
+                        payment: payment,
+                        balance: Math.max(0, remainingBalance)
+                    });
+
+                    totalPayment += payment;
+                    totalInterest += interest;
+                }
+            }
+
+            // Natijalarni ko'rsatish
+            document.getElementById('monthlyPayment').textContent = formatNumber(schedule[0].payment);
+            document.getElementById('totalPayment').textContent = formatNumber(totalPayment);
+            document.getElementById('totalInterest').textContent = formatNumber(totalInterest);
+            document.getElementById('result').style.display = 'block';
+
+            // Jadval yaratish
+            const scheduleBody = document.getElementById('scheduleBody');
+            scheduleBody.innerHTML = '';
+            
+            schedule.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align: center;">${row.month}</td>
+                    <td>${formatNumber(row.principal)}</td>
+                    <td>${formatNumber(row.interest)}</td>
+                    <td>${formatNumber(row.payment)}</td>
+                    <td>${formatNumber(row.balance)}</td>
+                `;
+                scheduleBody.appendChild(tr);
+            });
+            
+            document.getElementById('scheduleContainer').style.display = 'block';
+
+            // Telegram WebApp ga natijani yuborish
+            if (window.Telegram?.WebApp) {
+                Telegram.WebApp.sendData(JSON.stringify({
+                    totalAmount: totalAmount,
+                    downPayment: downPaymentAmount,
+                    loanAmount: amount,
+                    monthlyPayment: schedule[0].payment,
+                    totalPayment: totalPayment,
+                    totalInterest: totalInterest,
+                    schedule: schedule
+                }));
+            }
+        }
+
+        // Sahifa yuklanganda boshlang'ich to'lovni hisoblash
+        updateDownPayment();
+    </script>
+</body>
+</html>
